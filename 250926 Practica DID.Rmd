@@ -1,0 +1,399 @@
+---
+title: "Práctica DID"
+subtitle: Econometría - Doctorado en Ciencias Financieras
+author:
+  - Prof. Ernesto del Castillo - e.delcastillo@tec.mx
+  - Prof. René Cabral - rcabral@tec.mx
+date: 09-26-2025
+date-format: long
+output:
+  pdf_document: default
+  word_document: default
+  html_document:
+    df_print: paged
+toc: true
+header-includes:
+- \usepackage[default]{sourcesanspro}
+- \usepackage[T1]{fontenc}
+mainfont: SourceSansPro
+bibliography: DID.bib
+csl: apa.csl
+link-citations: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, include = TRUE)
+
+library(haven)
+library(tidyverse)
+library(dplyr)
+
+if (!require(Statamarkdown)) install.packages("Statamarkdown")
+library(Statamarkdown) # para procesar Stata usando Rmarkdown
+
+rm(list=ls()) #borra los objetos en el espacio de trabajo
+
+```
+
+
+
+\newpage
+
+# Practice 1: Canonical DID estimation - manually using Stata
+
+-   The simplest way of calculating the DID estimator is to manually take the difference in outcomes between treatment and control between the surveys.
+
++ We are using a subset of information from the Bangladesh Household Survey 1991–1998, conducted jointly by the Bangladesh Institute of Development Studies and the World Bank.
+
+- **We are testing the impact of a microcredit program for females in Bangladesh on household per capita expenditure.** This analysis compares household consumption in 1991 (initial) and 1998 (final) using a difference-in-differences approach.
+
+-   The information was collected at individual, household, and community levels.
+
+-   For practices 1, 2 and 3 we will be using the database from @khandker2011a
+
+-   The panel data is called _hh_9198.dta_ and can be obtained in the following **[Link](https://microdata.worldbank.org/index.php/catalog/436/data-dictionary).**
+
+
+
+## Variables descriptives
+
+```{stata p1a, echo=TRUE, cleanlog=TRUE, engine.path="/Applications/Stata 17/StataMP.app/Contents/MacOS/StataMP", fontsize="vsmall"}
+
+clear all
+
+use "hh_9198_a.dta"
+
+codebook dfmfd lexptot91 lexptot98 lexptot9891, compact
+
+
+```
+## DID Estimation using the Stata command `ttest`
+
++ The Stata command `ttest` takes the difference variable of outcomes _lexptot9891_ and compares it for microcredit program participants and nonparticipants. 
+
++ In essence, **the command `ttest` creates a second difference of _lexptot9891_ for those with dfmfd=1 (participant) and those with dfmfd=0 (nonparticipant).** 
+
++ This second difference gives the estimate of the impact of
+females’ microcredit program participation on per capita expenditure.
+
+```{stata p1b, echo=TRUE, cleanlog=TRUE, engine.path="/Applications/Stata 17/StataMP.app/Contents/MacOS/StataMP"}
+
+clear all
+
+use "hh_9198_a.dta"
+
+ttest lexptot9891, by(dfmfd) // dfmfd = HH has female microcredit participant: 1=Y, 0=N
+
+```
+
+
++ The result shows that microcredit **program participation by females increases percapita consumption by 11.13 percent** 
++ Notice that the impact is highly significant. 
+
+
+
+\newpage
+
+# Practice 2: Canonical DID estimation - Regression using Stata
+
++ Instead of manually taking the difference of the outcomes, DID can be implemented using regression analysis. 
+
++ The DID estimate can be calculated from the following regression:
+
+$$Y_{it} = \alpha + DD.T_i + \beta T_i + \delta t_i + \epsilon_{it}$$
+
++ Where: 
+    + $Y$ is the outcome variable.
+    + $T$ is the treatment variable. 
+    + $t$ is a time dummy. 
+    + $DD$ is the coefficient of the interaction of $T$ and $t$; and gives the estimate of the impact of treatment.
+
+```{stata p2a, echo=TRUE, cleanlog=TRUE, engine.path="/Applications/Stata 17/StataMP.app/Contents/MacOS/StataMP"}
+
+clear all
+
+use "hh_9198_b.dta"
+
+tabstat lexptot year dfmfd98 dfmfdyr, statistics( count min mean max sd ) by(dfmfd) labelwidth(30) longstub format(%6.3g)
+
+reg lexptot year dfmfd98 dfmfdyr
+
+test (dfmfdyr)
+
+```
+
++ The results show **the same impact of female participation in microfinance programs on households’ annual total per capita expenditures as obtained in the previous exercise.**
+
++ A basic assumption behind the simple implementation of canonical DID is that **other covariates do not change across the years.** 
+
++ But **if those variables do vary, they should be controlled for in the regression** to get the net effect of program participation on the outcome. 
+
++ So the regression model is extended to include other covariates that may affect the outcomes of interest:
+
+
+```{stata p2b, echo=FALSE, cleanlog=TRUE, engine.path="/Applications/Stata 17/StataMP.app/Contents/MacOS/StataMP"}
+
+clear all
+
+use "hh_9198_b.dta"
+
+global covariates sexhead agehead educhead vaccess pcirr rice wheat milk oil egg // global list of covariates
+
+describe $covariates, short // shortly describe the covariates
+
+reg lexptot year dfmfd98 dfmfdyr $covariates [pw=weight]
+
+```
++ By holding other factors constant, **the impact of the microfinance programs has changed from significant to insignificant** (dfmfdyr t = 1.07).
+
+
+\newpage
+
+# Practice 3: Checking Robustness with Fixed-Effects Regression - Using Stata´s command `xtreg`
+
++ Another way to measure the DID estimate is to use a fixed-effects regression instead of ordinary least squares (OLS). 
+
++ **Fixed-effects regression** controls for household’s unobserved and time-invariant characteristics that may influence the outcome variable. 
+
++ The `Stata´s` command `xtreg` is used to run fixed-effects regression. In particular, with the `fe` option, it fits fixed-effect models.
+
+
+```{stata p3a, echo=FALSE, cleanlog=TRUE, engine.path="/Applications/Stata 17/StataMP.app/Contents/MacOS/StataMP"}
+
+clear all
+
+use "/Users/ernesto/PracticaDID/data/hh_9198_b.dta"
+
+xtset nh year // to declare the panel data structure
+
+xtreg lexptot year dfmfd98 dfmfdyr, fe // the "fe" option, it fits fixed-effect models.
+
+
+```
+
++ Then, including other covariates in the regression, the fixed-effects model can be extended in the following way:
+
+```{stata p3b, echo=FALSE, cleanlog=TRUE, engine.path="/Applications/Stata 17/StataMP.app/Contents/MacOS/StataMP"}
+
+clear all
+
+use "/Users/ernesto/PracticaDID/data/hh_9198_b.dta"
+
+global covariates sexhead agehead educhead vaccess pcirr rice wheat milk oil egg // global list of covariates
+
+xtset nh year // to declare the panel data structure
+
+xtreg lexptot year dfmfd98 dfmfdyr $covariates , fe
+
+```
+
++ Results show that, after controlling for the effects of time-invariant unobserved factors, **female participation in microcredit has a 9.17 percent positive impact on household’s per capita consumption**, and the impact is very significant (dfmfdyr t = 2.49).
+
+
+\newpage
+## Staggered DID estimation
+
++ Remember that when treatment adoption is staggered (i.e., not everyone in the treatment group receives the treatment at the same time), the effects are heterogeneous (some people respond to the treatment more than others), and the effect is not constant over time, then the TWFE approach could introduce a bias, as it makes non-sense comparisons.
+
++ Recently, new approaches have emerged to address the issues with TWFE estimators. Notable examples include the Goodman-Bacon decomposition by @bacon2021 and the @callaway2021 approach. 
+
+## The Callaway and Sant’Anna approach
+
++ Callaway and Sant’Anna (CS) approach was the first to allow for covariate-specific trends across groups in DID setups with staggered treatment. 
+  + This is relevant when the differences in the observed characteristics among groups lead to the PTA violation. 
+
++ CS propose a two-step procedure that avoids the TWFE unsound comparisons. 
+
+1. The first step proposes **identifying all possible valid (2x2) comparisons** and estimating the corresponding ATTs. 
+    + Here, the CS ATTs estimation strategy relies on robust estimators, including:
+        + The **outcome regressions (OR) estimator.** Requires the correct specification of the outcome evolution for the comparison group.
+        + The **inverse-probability-weighted (IPW) estimator.** Must correctly model the conditional probability of unit $i$ being in the group $g$ given their covariates.
+        + The **doubly robust (DR) estimator.** proposed by @santana2020. Combines both
+approaches (hence the name). It requires correctly specifying either (but not necessarily both).
+          + Hence, the DR is the most robust to modeling misspecifications.
+          + The DR allows using suitable covariates to increase the likelihood of identifying the units treated.
+          
+2. In the second step, **CS aggregates the ATTs into time groups (cohorts) to summarize the results.** 
+
+## Why Choosing the CS approach
+
++ Another advantage of CS approach is its **robustness, as instead of point-wise inference of average ATTs, CS proposes to use a simple multiplier bootstrap procedure to estimate simultaneous (group and time) confidence intervals.**
+
++ The CS methodology offers three aggregation methods to summarize the potentially large number of group-time average treatment effects. 
+  + 1. The estimation of ATTs for specific treatment groups (cohorts)
+  + 2. The cumulative ATTs over time. 
+  + 3. ATTs that change based on the length of treatment exposure, **similar to an event study.**
+
++ The CS approach quickly gained popularity as they developed packages for both `Stata` (`csdid`) and `R` users (`did`). 
+  + In 2023, the latest version of `Stata` (18) integrated their solution natively with the built-in command `xthdidregress`.
+  + **Since the CS approach is likely to keep gaining traction, we will focus on their solution by providing an example using `Stata` and `R`.**
+
+
+# Practice 4: Staggered DID estimation in Stata
+
++ For Practice 4 & 5 we will be using a subset of the data used in the article "Subnational Public Debt Sustainability in Mexico: Is the new fiscal rule working?" by @delcastillo24
+
++ *The study evaluates the impact of the fiscal rule alert system on the levels of debt accumulation across Mexican states.** 
+    + Using a quarterly panel dataset comprising the period 2013–2020 and employing difference-in-differences techniques. 
+
+## Stata Dataset description
+```{stata p4a_data, echo=TRUE, cleanlog=TRUE, engine.path="/Applications/Stata 17/StataMP.app/Contents/MacOS/StataMP"}
+
+clear all
+
+use "/Users/ernesto/PracticaDID/data/panel_mex.dta"
+
+xtset id date // declare the panel data structure
+
+
+describe // variables description
+
+* 
+tabstat deuda_r_pc, statistics( min mean median max sd ) by(reg_banxico) labelwidth(30) columns(statistics) longstub format(%10.2g)
+
+
+* Check the structure of the staggered treatment
+tab  first_treat treated
+
+
+```
+
+## Stata CSDID estimation
+
+```{stata p4b_did, echo=TRUE, cleanlog=TRUE, engine.path="/Applications/Stata 17/StataMP.app/Contents/MacOS/StataMP"}
+
+clear all
+
+use "/Users/ernesto/PracticaDID/data/panel_mex.dta"
+
+xtset id date // declare the panel data structure
+
+*** Use CSDID for Estimation
+
+csdid deuda_r_pc rating ied, ivar(id) time(quarter_id) gvar(first_treat) method(dripw) cluster(regions) wboot rseed(123) agg(simple)
+
+estimates store csdid_deuda
+global tr_eff = _b[ATT]
+dis $tr_eff
+
+estat all
+csdid_estat event, window (-16 15)
+csdid_plot
+
+```
+
+\newpage
+# Practice 5: Staggered DID estimation in R
+
++ Here we will be reproducing the same analysis of Practice 4, but using R. 
+
+## R CSDID estimation (without covariates)
+
+```{r p4c_did_nocov, echo=FALSE, message=FALSE, warning=FALSE}
+
+rm(list=ls()) #borra los objetos en el espacio de trabajo
+
+library(haven)
+data <- read_dta("/Users/ernesto/PracticaDID/data/panel_mex.dta")
+
+library("did")
+is.numeric(data$id)         # idname must be numeric
+is.numeric(data$quarter_id) # tname must be numeric
+
+
+# See: https://bcallaway11.github.io/did/reference/att_gt.html
+
+model1 <-  att_gt(
+  yname = "deuda_r_pc", # The name of the outcome variable
+  tname = "quarter_id",       # The name of the column with the time periods
+  idname = "id",        # The individual (cross-sectional unit) id name
+  gname ="first_treat",   # Variable contains the first period when an observation is treated
+  xformla = NULL,       # A formula for the covariates to include in the model.
+  data = data,         # The name of the data.frame that contains the data
+  panel = TRUE,         # Whether or not the data is a panel dataset. 
+  control_group = "nevertreated", # Which units to use the control group. Other opt "notyettreated" 
+  alp = 0.05,           # the significance level, default is 0.05
+  bstrap = TRUE,        # If standard errors are clustered, then one must set it TRUE
+  biters = 1000,        # The number of bootstrap iterations to use. 
+  clustervars = NULL,   # A vector of variables names to cluster on. At most 2 variables. 
+  est_method = "dr",    # Other options: "ipw", "reg"
+)
+
+summary(model1)
+
+# Overall effect 
+group_effects1 <- aggte(model1, type = "group")
+summary(group_effects1)
+
+# Event Study
+event_study1 <- aggte(model1, type = "dynamic")
+summary(event_study1)
+
+# A main type of aggregation is into an event study plot.
+plot1 <- ggdid(event_study1,
+        ylim = NULL,
+        xlab = NULL,
+        ylab = "Constant real pesos",
+        title = "Average Effect of LDF alert system on debt per-capita",
+        xgap = 3,
+        ref_line = 0
+        )
+plot1
+
+```
+
+ 
+## R CSDID estimation (with covariates)
+
+```{r p4d_did_cov, echo=FALSE}
+
+
+
+library("did")
+
+model2 <-  att_gt(
+  yname = "deuda_r_pc", # The name of the outcome variable
+  tname = "quarter_id",       # The name of the column with the time periods
+  idname = "id",        # The individual (cross-sectional unit) id name
+  gname ="first_treat",   # Variable contains the first period when an observation is treated
+  xformla = ~rating,   # A formula for the covariates to include in the model.
+  data = data,         # The name of the data.frame that contains the data
+  panel = TRUE,         # Whether or not the data is a panel dataset. 
+  control_group = "nevertreated", # Which units to use the control group. 
+  alp = 0.05,           # the significance level, default is 0.05
+  bstrap = TRUE,        # If standard errors are clustered, then one must set it TRUE
+  cband = FALSE,         # whether or not to compute a uniform confidence band
+  biters = 1000,        # The number of bootstrap iterations to use. 
+  clustervars = "regions",   # A vector of variables names to cluster on. At most 2 variables.
+  est_method = "dr",    # Other options: "ipw", "reg"
+  base_period = "varying",
+  print_details = FALSE,
+  pl = FALSE,
+)
+
+summary(model2)
+
+
+# Overall effect 
+group_effects2 <- aggte(model2, type = "group")
+summary(group_effects2)
+
+
+# Event Study
+event_study2 <- aggte(model2, type = "dynamic")
+summary(event_study2)
+
+plot2 <- ggdid(event_study2,
+        ylab = "Constant real pesos",
+        title = "Average Effect of LDF alert system on debt per-capita",
+        xgap = 3
+        )
+
+plot2
+
+
+```
+
+
+\newpage
+# References
