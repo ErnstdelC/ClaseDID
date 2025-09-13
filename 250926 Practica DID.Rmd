@@ -162,7 +162,7 @@ reg lexptot year dfmfd98 dfmfdyr $covariates [pw=weight]
 
 clear all
 
-use "/Users/ernesto/PracticaDID/data/hh_9198_b.dta"
+use "hh_9198_b.dta"
 
 xtset nh year // to declare the panel data structure
 
@@ -177,7 +177,7 @@ xtreg lexptot year dfmfd98 dfmfdyr, fe // the "fe" option, it fits fixed-effect 
 
 clear all
 
-use "/Users/ernesto/PracticaDID/data/hh_9198_b.dta"
+use "hh_9198_b.dta"
 
 global covariates sexhead agehead educhead vaccess pcirr rice wheat milk oil egg // global list of covariates
 
@@ -228,20 +228,22 @@ approaches (hence the name). It requires correctly specifying either (but not ne
   + In 2023, the latest version of `Stata` (18) integrated their solution natively with the built-in command `xthdidregress`.
   + **Since the CS approach is likely to keep gaining traction, we will focus on their solution by providing an example using `Stata` and `R`.**
 
+\newpage
 
-# Practice 4: Staggered DID estimation in Stata
+# Practice 4: Staggered DID estimation using `Stata`
 
 + For Practice 4 & 5 we will be using a subset of the data used in the article "Subnational Public Debt Sustainability in Mexico: Is the new fiscal rule working?" by @delcastillo24
 
 + *The study evaluates the impact of the fiscal rule alert system on the levels of debt accumulation across Mexican states.** 
     + Using a quarterly panel dataset comprising the period 2013–2020 and employing difference-in-differences techniques. 
 
-## Stata Dataset description
+## Dataset description using `Stata`
+
 ```{stata p4a_data, echo=TRUE, cleanlog=TRUE, engine.path="/Applications/Stata 17/StataMP.app/Contents/MacOS/StataMP"}
 
 clear all
 
-use "/Users/ernesto/PracticaDID/data/panel_mex.dta"
+use "panel_mex.dta"
 
 xtset id date // declare the panel data structure
 
@@ -249,7 +251,7 @@ xtset id date // declare the panel data structure
 describe // variables description
 
 * 
-tabstat deuda_r_pc, statistics( min mean median max sd ) by(reg_banxico) labelwidth(30) columns(statistics) longstub format(%10.2g)
+tabstat deuda_r_pc, statistics( min mean median max sd ) by(regions) labelwidth(30) columns(statistics) longstub format(%10.2g)
 
 
 * Check the structure of the staggered treatment
@@ -258,13 +260,15 @@ tab  first_treat treated
 
 ```
 
-## Stata CSDID estimation
+\newpage
+
+## CSDID estimation using `Stata`
 
 ```{stata p4b_did, echo=TRUE, cleanlog=TRUE, engine.path="/Applications/Stata 17/StataMP.app/Contents/MacOS/StataMP"}
 
 clear all
 
-use "/Users/ernesto/PracticaDID/data/panel_mex.dta"
+use "panel_mex.dta"
 
 xtset id date // declare the panel data structure
 
@@ -283,18 +287,18 @@ csdid_plot
 ```
 
 \newpage
-# Practice 5: Staggered DID estimation in R
+# Practice 5: Staggered DID estimation using `R`
 
-+ Here we will be reproducing the same analysis of Practice 4, but using R. 
++ Here we will be reproducing the same analysis of Practice 4, but using `R`. 
 
-## R CSDID estimation (without covariates)
+## CSDID estimation using `R` (without covariates)
 
 ```{r p4c_did_nocov, echo=FALSE, message=FALSE, warning=FALSE}
 
 rm(list=ls()) #borra los objetos en el espacio de trabajo
 
 library(haven)
-data <- read_dta("/Users/ernesto/PracticaDID/data/panel_mex.dta")
+data <- read_dta("panel_mex.dta")
 
 library("did")
 is.numeric(data$id)         # idname must be numeric
@@ -342,8 +346,9 @@ plot1
 
 ```
 
- 
-## R CSDID estimation (with covariates)
+\newpage
+
+## CSDID estimation using `R` (with covariates)
 
 ```{r p4d_did_cov, echo=FALSE}
 
